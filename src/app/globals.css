@@ -1490,3 +1490,223 @@ body::before {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+/* ============================================
+   GOOGLE OAUTH BUTTON
+   ============================================ */
+
+.btn-google {
+  background: white;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  font-weight: 500;
+  font-size: 0.95rem;
+  gap: var(--space-sm);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-google:hover {
+  background: #f8f9fa;
+  border-color: #c6c9cc;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.google-icon {
+  flex-shrink: 0;
+}
+
+/* Auth Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin: var(--space-lg) 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.auth-divider span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ============================================
+   OTP INPUT
+   ============================================ */
+
+.otp-input {
+  font-family: 'Courier New', monospace;
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 8px;
+  text-align: center;
+  padding: 18px;
+  color: var(--accent-blue-light);
+}
+
+.otp-input::placeholder {
+  letter-spacing: 8px;
+  color: var(--text-muted);
+  opacity: 0.3;
+}
+
+/* ============================================
+   SUCCESS / INFO ALERTS
+   ============================================ */
+
+.success-alert {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  color: var(--accent-green-light);
+  font-size: 0.9rem;
+  margin-bottom: var(--space-md);
+  animation: slideDown var(--transition-base) ease;
+}
+
+.remaining-attempts {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 0.8rem;
+  color: var(--accent-amber-light);
+}
+
+/* ============================================
+   AUTH USER ACTIONS BAR
+   ============================================ */
+
+.auth-user-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ============================================
+   DANGER ZONE (Account Deletion)
+   ============================================ */
+
+.danger-zone-card {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+}
+
+.danger-zone-card .section-title {
+  color: var(--accent-red-light);
+}
+
+/* ============================================
+   LOGIN HISTORY
+   ============================================ */
+
+.login-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.login-history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--bg-glass);
+  border: 1px solid var(--border-subtle);
+}
+
+.login-history-item.failed {
+  border-color: rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.login-history-status {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.login-history-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.login-history-time {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.login-history-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================
+   ACCOUNT INFO
+   ============================================ */
+
+.mb-lg {
+  margin-bottom: var(--space-lg);
+}
+
+.account-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.account-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-info-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.account-info-value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ============================================
+   UTILITY
+   ============================================ */
+
+.mt-md {
+  margin-top: var(--space-md);
+}
+
+.mb-md {
+  margin-bottom: var(--space-md);
+}
+
+.w-full {
+  width: 100%;
+}

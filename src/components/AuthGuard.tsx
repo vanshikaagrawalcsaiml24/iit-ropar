@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AuthForm from './AuthForm';
 
 interface AuthGuardProps {
@@ -8,10 +9,25 @@ interface AuthGuardProps {
 }
 
 export default function AuthGuard({ children }: AuthGuardProps) {
+  return (
+    <Suspense fallback={
+      <div className="content-wrapper">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+          <div className="search-spinner" style={{ width: '32px', height: '32px' }} />
+        </div>
+      </div>
+    }>
+      <AuthGuardInner>{children}</AuthGuardInner>
+    </Suspense>
+  );
+}
+
+function AuthGuardInner({ children }: AuthGuardProps) {
   const [user, setUser] = useState<{ userId: string; username: string } | null>(null);
   const [checking, setChecking] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const searchParams = useSearchParams();
 
   const checkAuth = useCallback(async (isPolling = false) => {
     try {
@@ -24,14 +40,12 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           return;
         }
       }
-      // Not authenticated
       if (user && isPolling) {
-        // Was logged in but session expired
         setSessionExpired(true);
       }
       setUser(null);
     } catch {
-      // Network error — don't logout on transient failures
+      // Network error — don't logout
     } finally {
       setChecking(false);
     }
@@ -40,6 +54,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   useEffect(() => {
     checkAuth(false);
   }, [checkAuth]);
+
+  // Handle Google OAuth return
+  useEffect(() => {
+    const authStatus = searchParams.get('auth');
+    if (authStatus === 'success') {
+      checkAuth(false);
+    }
+  }, [searchParams, checkAuth]);
 
   // Poll session every 5 minutes
   useEffect(() => {
@@ -59,14 +81,13 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
-      // Ignore errors
+      // Ignore
     }
     setUser(null);
     setSessionExpired(false);
   };
 
-  const handleAuthSuccess = (authUser: { username: string }) => {
-    // Re-verify to get full user data with userId
+  const handleAuthSuccess = () => {
     checkAuth(false);
   };
 
@@ -93,7 +114,6 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // Authenticated — show user bar + children
   return (
     <div>
       <div className="auth-user-bar">
@@ -101,9 +121,14 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           <div className="user-avatar">{user.username[0].toUpperCase()}</div>
           <span className="user-name">Logged in as <strong>{user.username}</strong></span>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={handleLogout} id="logout-btn">
-          Logout
-        </button>
+        <div className="auth-user-actions">
+          <a href="/account" className="btn btn-ghost btn-sm" id="account-settings-btn">
+            ⚙️ Account
+          </a>
+          <button className="btn btn-ghost btn-sm" onClick={handleLogout} id="logout-btn">
+            Logout
+          </button>
+        </div>
       </div>
       {children(user)}
     </div>
