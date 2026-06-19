@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import TicketDisplay from '@/components/TicketDisplay';
 import StatusTracker from '@/components/StatusTracker';
+import FAQCard from '@/components/FAQCard';
 
 interface TrackedQuery {
   _id: string;
@@ -30,6 +31,11 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
   const [submitting, setSubmitting] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
+
+  // Semantic Search state
+  const [similarFaqs, setSimilarFaqs] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Track query state
   const [trackTicketId, setTrackTicketId] = useState('');
@@ -60,6 +66,42 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
   useEffect(() => {
     fetchMyQueries();
   }, [fetchMyQueries]);
+
+  // Real-time semantic search
+  useEffect(() => {
+    if (!question.trim()) {
+      setSimilarFaqs([]);
+      setIsSearching(false);
+      return;
+    }
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/faqs?q=${encodeURIComponent(question.trim())}`);
+        const data = await res.json();
+
+        if (data.faqs) {
+          // Take top 3
+          setSimilarFaqs(data.faqs.slice(0, 3));
+        } else {
+          setSimilarFaqs([]);
+        }
+      } catch (err) {
+        setSimilarFaqs([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [question]);
 
   const handleSubmitQuery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +205,34 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
                   required
                 />
               </div>
+
+              {/* Real-time Semantic Search Results */}
+              {isSearching ? (
+                <div style={{ marginBottom: 'var(--space-md)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  <span className="search-spinner" style={{ width: '12px', height: '12px', display: 'inline-block', marginRight: '8px' }} />
+                  Checking for similar answers...
+                </div>
+              ) : similarFaqs.length > 0 ? (
+                <div style={{ marginBottom: 'var(--space-md)' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent-orange)', marginBottom: 'var(--space-sm)' }}>
+                    💡 Similar answers found:
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {similarFaqs.map((faq, idx) => (
+                      <FAQCard
+                        key={`similar-${idx}`}
+                        question={faq.question}
+                        answer={faq.answer}
+                        category={faq.category}
+                      />
+                    ))}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 'var(--space-sm)' }}>
+                    Still need help? You can submit your query below.
+                  </div>
+                </div>
+              ) : null}
+
               <button
                 type="submit"
                 className="btn btn-primary w-full"
