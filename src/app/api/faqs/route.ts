@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { cookies } from 'next/headers';
 import { sanitizeInput, escapeRegex } from '@/lib/security';
 import { checkRateLimit, getClientIp, rateLimitResponse, RATE_LIMITS } from '@/lib/rateLimit';
+import { searchFaqs } from '@/lib/qdrant';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,22 +24,11 @@ export async function GET(request: NextRequest) {
 
     let faqs;
     if (q && q.trim()) {
-      // Sanitize and escape the search query to prevent regex injection
+      // Use AI Semantic Search via Qdrant
       const sanitized = sanitizeInput(q);
-      const escaped = escapeRegex(sanitized);
-      const regex = new RegExp(escaped, 'i');
-
-      faqs = await db
-        .collection('faqs')
-        .find({
-          $or: [
-            { question: { $regex: regex } },
-            { answer: { $regex: regex } },
-          ],
-        })
-        .sort({ createdAt: -1 })
-        .toArray();
+      faqs = await searchFaqs(sanitized, 5);
     } else {
+      // Return all FAQs if no query
       faqs = await db
         .collection('faqs')
         .find({})
