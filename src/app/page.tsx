@@ -20,12 +20,14 @@ export default function Home() {
   const fetchFaqs = useCallback(async (query: string) => {
     setLoading(true);
     try {
-      const url = query.trim()
-        ? `/api/faqs?q=${encodeURIComponent(query.trim())}`
-        : '/api/faqs';
-      const res = await fetch(url);
-      const data = await res.json();
-      setFaqs(data.faqs || []);
+      if (query.trim()) {
+        const res = await fetch(`/api/faqs?q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        setFaqs(data.faqs || []);
+      } else {
+        // Do not list all FAQs when search is empty
+        setFaqs([]);
+      }
     } catch (error) {
       console.error('Failed to fetch FAQs:', error);
     } finally {
