@@ -88,16 +88,14 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            !isAdmin && (
-              <Link
-                href="/admin"
-                className="nav-link nav-link-admin"
-                onClick={() => setIsOpen(false)}
-                id="nav-link-admin"
-              >
-                🔒 Admin
-              </Link>
-            )
+            <Link
+              href="/admin"
+              className="nav-link nav-link-admin"
+              onClick={() => setIsOpen(false)}
+              id="nav-link-admin"
+            >
+              {pathname.startsWith('/admin') ? '⚙️ Dashboard' : '🔒 Admin'}
+            </Link>
           )}
         </div>
       </div>

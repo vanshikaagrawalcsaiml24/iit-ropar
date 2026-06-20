@@ -108,7 +108,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return Response.json({ error: 'Invalid action. Use "answer" or "approve"' }, { status: 400 });
+    // Action: escalate
+    if (action === 'escalate') {
+      if (query.status === 'resolved' || query.status === 'escalated') {
+        return Response.json({ error: 'Query cannot be escalated' }, { status: 400 });
+      }
+
+      await db.collection('queries').updateOne(
+        { _id: new ObjectId(queryId) },
+        {
+          $set: {
+            status: 'escalated',
+            escalatedBy: solverId,
+            escalatedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      return Response.json({
+        success: true,
+        message: 'Query has been escalated to admin',
+      });
+    }
+
+    return Response.json({ error: 'Invalid action. Use "answer", "approve", or "escalate"' }, { status: 400 });
   } catch (error) {
     console.error('POST /api/queries/solve error:', error);
     return Response.json({ error: 'Failed to process solution' }, { status: 500 });

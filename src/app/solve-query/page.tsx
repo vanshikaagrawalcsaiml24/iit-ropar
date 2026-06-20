@@ -127,6 +127,38 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
     }
   };
 
+  const handleEscalate = async () => {
+    if (!query || !confirm('Are you sure you want to escalate this to an admin?')) return;
+
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const res = await fetch('/api/queries/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queryId: query._id,
+          action: 'escalate',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage('🚨 Query escalated to system administrators.');
+        setTimeout(fetchQuery, 2000);
+      } else {
+        setError(data.error || 'Failed to escalate');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="content-wrapper">
       <div className="page-header">
@@ -221,6 +253,15 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
                   >
                     Skip →
                   </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={handleEscalate}
+                    disabled={submitting}
+                    id="escalate-query-btn"
+                    title="Escalate to admin"
+                  >
+                    🚨 Escalate
+                  </button>
                 </div>
               </div>
             )}
@@ -273,6 +314,15 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
                     id="skip-review-btn"
                   >
                     Skip →
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={handleEscalate}
+                    disabled={submitting}
+                    id="escalate-review-btn"
+                    title="Escalate to admin"
+                  >
+                    🚨 Escalate
                   </button>
                 </div>
               </div>
