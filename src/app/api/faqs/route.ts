@@ -70,17 +70,26 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getDb();
+    const qdrantId = randomUUID();
     const result = await db.collection('faqs').insertOne({
       question,
       answer,
       category,
+      qdrantId,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
-    return Response.json({ 
-      success: true, 
-      id: result.insertedId.toString() 
+    try {
+      await addFaqToQdrant(qdrantId, question, answer, category);
+    } catch (error) {
+      console.error('Failed to add FAQ to Qdrant:', error);
+      // Proceed anyway, but in production we might want a retry queue or rollback
+    }
+
+    return Response.json({
+      success: true,
+      id: result.insertedId.toString()
     }, { status: 201 });
   } catch (error) {
     console.error('POST /api/faqs error:', error);
@@ -113,10 +122,19 @@ export async function DELETE(request: NextRequest) {
     }
 
     const db = await getDb();
+    const faq = await db.collection('faqs').findOne({ _id: new ObjectId(id) });
+    if (!faq) {
+      return Response.json({ error: 'FAQ not found' }, { status: 404 });
+    }
+
     const result = await db.collection('faqs').deleteOne({ _id: new ObjectId(id) });
 
-    if (result.deletedCount === 0) {
-      return Response.json({ error: 'FAQ not found' }, { status: 404 });
+    if (faq.qdrantId) {
+      try {
+        await deleteFaqFromQdrant(faq.qdrantId);
+      } catch (error) {
+        console.error('Failed to delete FAQ from Qdrant:', error);
+      }
     }
 
     return Response.json({ success: true });
