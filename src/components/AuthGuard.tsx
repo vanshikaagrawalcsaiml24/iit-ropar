@@ -1,13 +1,10 @@
 'use client';
-
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AuthForm from './AuthForm';
-
 interface AuthGuardProps {
   children: (user: { userId: string; username: string }) => React.ReactNode;
 }
-
 export default function AuthGuard({ children }: AuthGuardProps) {
   return (
     <Suspense fallback={
@@ -21,35 +18,41 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     </Suspense>
   );
 }
-
 function AuthGuardInner({ children }: AuthGuardProps) {
   const [user, setUser] = useState<{ userId: string; username: string } | null>(null);
   const [checking, setChecking] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const searchParams = useSearchParams();
-
   const checkAuth = useCallback(async (isPolling = false) => {
     try {
       const res = await fetch('/api/auth/verify');
       if (res.ok) {
         const data = await res.json();
         if (data.authenticated) {
-          setUser(data.user);
+          setUser((prev) => {
+            // Only update state if the user object actually changed
+            if (prev && prev.userId === data.user.userId && prev.username === data.user.username) {
+              return prev;
+            }
+            return data.user;
+          });
           setSessionExpired(false);
           return;
         }
-      }
-      if (user && isPolling) {
-        setSessionExpired(true);
-      }
-      setUser(null);
+      } setSessionExpired(false);
+      setUser((prev) => {
+        if (prev && isPolling) {
+          setSessionExpired(true);
+        }
+        return null;
+      });
     } catch {
       // Network error — don't logout
     } finally {
       setChecking(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     checkAuth(false);
