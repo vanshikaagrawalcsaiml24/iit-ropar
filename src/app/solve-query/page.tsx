@@ -11,6 +11,20 @@ interface SolveQuery {
   proposedAnswer?: string;
   approvals: string[];
   requiredApprovals: number;
+  upvotes?: number;
+  upvotedBy?: string[];
+  createdAt?: string;
+}
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function SolveQueryPage() {
@@ -29,6 +43,8 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [resolved, setResolved] = useState(false);
+  const [upvoting, setUpvoting] = useState(false);
+  const [upvoteAnimating, setUpvoteAnimating] = useState(false);
 
   const fetchQuery = async () => {
     setLoading(true);
@@ -56,6 +72,44 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
   useEffect(() => {
     fetchQuery();
   }, []);
+
+  const handleUpvote = async () => {
+    if (!query || upvoting) return;
+
+    setUpvoting(true);
+    setUpvoteAnimating(true);
+    setTimeout(() => setUpvoteAnimating(false), 400);
+
+    try {
+      const res = await fetch('/api/queries/upvote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queryId: query._id }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setQuery((prev) => {
+          if (!prev) return prev;
+          const newUpvotedBy = data.hasUpvoted
+            ? [...(prev.upvotedBy || []), user.userId]
+            : (prev.upvotedBy || []).filter((id: string) => id !== user.userId);
+          return {
+            ...prev,
+            upvotes: data.upvotes,
+            upvotedBy: newUpvotedBy,
+          };
+        });
+      } else {
+        setError(data.error || 'Failed to upvote');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setUpvoting(false);
+    }
+  };
 
   const handleSubmitAnswer = async () => {
     if (!query || !answer.trim()) return;
@@ -159,6 +213,9 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
     }
   };
 
+  const hasUpvoted = query?.upvotedBy?.includes(user.userId) || false;
+  const upvoteCount = query?.upvotes || 0;
+
   return (
     <div className="content-wrapper">
       <div className="page-header">
@@ -193,9 +250,16 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
           <div className="glass-card solve-query-card" id="solve-query-card">
             {/* Query Info */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                {query.ticketId}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  {query.ticketId}
+                </span>
+                {query.createdAt && (
+                  <span className="query-timestamp">
+                    📅 {formatDate(query.createdAt)}
+                  </span>
+                )}
+              </div>
               <span className={`badge badge-${query.status === 'in-review' ? 'review' : query.status}`}>
                 <span className="badge-dot" />
                 {query.status === 'in-review' ? 'In Review' : 'Active'}
@@ -203,6 +267,35 @@ function SolveQueryContent({ user }: { user: { userId: string; username: string 
             </div>
 
             <h2 className="solve-query-question">{query.question}</h2>
+
+            {/* Upvote Button */}
+            <div className="upvote-section">
+              <button
+                className={`upvote-btn ${hasUpvoted ? 'active' : ''} ${upvoteAnimating ? 'animating' : ''}`}
+                onClick={handleUpvote}
+                disabled={upvoting}
+                id="upvote-query-btn"
+                title={hasUpvoted ? 'Remove upvote' : 'Upvote this query'}
+              >
+                <svg
+                  className="upvote-icon"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill={hasUpvoted ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+                <span className="upvote-count">{upvoteCount}</span>
+              </button>
+              <span className="upvote-label">
+                {upvoteCount === 1 ? '1 upvote' : `${upvoteCount} upvotes`}
+              </span>
+            </div>
 
             {error && <div className="error-alert">{error}</div>}
             {message && (

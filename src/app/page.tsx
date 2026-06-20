@@ -9,6 +9,7 @@ interface FAQ {
   question: string;
   answer: string;
   category?: string;
+  createdAt?: string;
 }
 
 export default function Home() {
@@ -85,6 +86,7 @@ export default function Home() {
               question={faq.question}
               answer={faq.answer}
               category={faq.category}
+              createdAt={faq.createdAt}
             />
           ))}
         </div>

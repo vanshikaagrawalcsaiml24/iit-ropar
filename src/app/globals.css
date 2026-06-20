@@ -701,8 +701,115 @@ body::before {
 }
 
 .faq-card-category {
-  margin-top: var(--space-sm);
   display: inline-block;
+}
+
+.faq-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.faq-card-timestamp {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* === Query Timestamp === */
+.query-timestamp {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* === Upvote Button === */
+.upvote-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-sm) 0;
+}
+
+.upvote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-light);
+  background: var(--bg-glass);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all var(--transition-base);
+  user-select: none;
+}
+
+.upvote-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--accent-blue-light);
+  transform: translateY(-1px);
+}
+
+.upvote-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+
+.upvote-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: var(--accent-blue-light);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+}
+
+.upvote-btn.active:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.2);
+}
+
+.upvote-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upvote-btn.animating {
+  animation: upvotePop 0.4s ease;
+}
+
+.upvote-icon {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.upvote-btn.active .upvote-icon {
+  transform: translateY(-1px);
+}
+
+.upvote-count {
+  font-variant-numeric: tabular-nums;
+  min-width: 1ch;
+}
+
+.upvote-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+@keyframes upvotePop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.15); }
+  60% { transform: scale(0.95); }
+  100% { transform: scale(1); }
 }
 
 /* === Query Sections === */

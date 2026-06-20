@@ -109,6 +109,8 @@ export async function POST(request: NextRequest) {
       proposedAnswer: null,
       approvals: [],
       requiredApprovals: 3,
+      upvotes: 0,
+      upvotedBy: [],
       userId: new ObjectId(user.userId),
       username: user.username,
       createdAt: new Date(),
