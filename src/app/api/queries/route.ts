@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const question = sanitizeInput(body.question || '');
+    const title = sanitizeInput(body.title || '');
 
     if (!question) {
       return Response.json({ error: 'Question is required' }, { status: 400 });
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
 
     await db.collection('queries').insertOne({
       ticketId,
+      title: title || question.substring(0, 60),
       question,
       status: 'active',
       proposedAnswer: null,

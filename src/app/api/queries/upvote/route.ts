@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       await db.collection('queries').updateOne(
         { _id: new ObjectId(queryId) },
         {
-          $pull: { upvotedBy: userId } as Record<string, unknown>,
+          $pull: { upvotedBy: userId } as any,
           $inc: { upvotes: -1 },
           $set: { updatedAt: new Date() },
         }
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       await db.collection('queries').updateOne(
         { _id: new ObjectId(queryId) },
         {
-          $push: { upvotedBy: userId } as Record<string, unknown>,
+          $push: { upvotedBy: userId } as any,
           $inc: { upvotes: 1 },
           $set: { updatedAt: new Date() },
         }
