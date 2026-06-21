@@ -572,6 +572,12 @@ body::before {
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
+.badge-escalated {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red-light);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 .badge-dot {
   width: 6px;
   height: 6px;
@@ -581,6 +587,7 @@ body::before {
 .badge-active .badge-dot { background: var(--accent-amber); }
 .badge-review .badge-dot { background: var(--accent-blue); }
 .badge-resolved .badge-dot { background: var(--accent-green); }
+.badge-escalated .badge-dot { background: var(--accent-red); }
 
 /* === Page Headers === */
 .page-header {
