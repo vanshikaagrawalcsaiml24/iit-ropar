@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmModal from '@/components/ConfirmModal';
+import { FAQ_CATEGORIES } from '@/lib/categories';
 
 interface FAQ {
   _id: string;
   question: string;
   answer: string;
   category?: string;
+  subcategory?: string;
   createdAt: string;
 }
 
@@ -39,6 +41,7 @@ export default function AdminDashboardPage() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [category, setCategory] = useState('');
+  const [subcategory, setSubcategory] = useState('');
   const [adding, setAdding] = useState(false);
   const [addMessage, setAddMessage] = useState('');
   const [addError, setAddError] = useState('');
@@ -163,11 +166,11 @@ export default function AdminDashboardPage() {
       const res = await fetch('/api/faqs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim(), answer: answer.trim(), category: category.trim() }),
+        body: JSON.stringify({ question: question.trim(), answer: answer.trim(), category: category.trim(), subcategory: subcategory.trim() }),
       });
       if (res.ok) {
         setAddMessage('✅ FAQ added and synchronized with Qdrant successfully!');
-        setQuestion(''); setAnswer(''); setCategory('');
+        setQuestion(''); setAnswer(''); setCategory(''); setSubcategory('');
         fetchFaqs();
         setTimeout(() => setAddMessage(''), 3000);
       } else {
@@ -462,9 +465,37 @@ export default function AdminDashboardPage() {
                 <label className="input-label" htmlFor="faq-answer">Answer</label>
                 <textarea id="faq-answer" className="input textarea" placeholder="Enter the FAQ answer..." value={answer} onChange={(e) => setAnswer(e.target.value)} rows={4} required />
               </div>
+              <div className="input-group mb-md">
+                <label className="input-label" htmlFor="faq-category">Category</label>
+                <select 
+                  id="faq-category" 
+                  className="input" 
+                  value={category} 
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setSubcategory('');
+                  }}
+                >
+                  <option value="">Select a category...</option>
+                  {FAQ_CATEGORIES.map(cat => (
+                    <option key={cat.name} value={cat.name}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
               <div className="input-group mb-lg">
-                <label className="input-label" htmlFor="faq-category">Category (optional)</label>
-                <input id="faq-category" className="input" type="text" placeholder="e.g. Academics, Hostel" value={category} onChange={(e) => setCategory(e.target.value)} />
+                <label className="input-label" htmlFor="faq-subcategory">Subcategory</label>
+                <select 
+                  id="faq-subcategory" 
+                  className="input" 
+                  value={subcategory} 
+                  onChange={(e) => setSubcategory(e.target.value)}
+                  disabled={!category}
+                >
+                  <option value="">Select a subcategory...</option>
+                  {category && FAQ_CATEGORIES.find(c => c.name === category)?.subcategories.map(sub => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
               </div>
               <button type="submit" className="btn btn-primary w-full" disabled={adding || !question.trim() || !answer.trim()}>
                 {adding ? 'Adding...' : '📝 Add FAQ & Embed'}
@@ -492,7 +523,12 @@ export default function AdminDashboardPage() {
                     <div className="admin-faq-content">
                       <div className="admin-faq-question">{faq.question}</div>
                       <div className="admin-faq-answer">{faq.answer}</div>
-                      {faq.category && <span className="badge badge-review" style={{ marginTop: '8px', display: 'inline-flex' }}>{faq.category}</span>}
+                      {(faq.category || faq.subcategory) && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          {faq.category && <span className="badge badge-review">{faq.category}</span>}
+                          {faq.subcategory && <span className="badge" style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>{faq.subcategory}</span>}
+                        </div>
+                      )}
                     </div>
                     <button className="btn btn-danger btn-sm btn-icon" onClick={() => setDeleteTarget(faq)} title="Delete FAQ" style={{ flexShrink: 0 }}>🗑️</button>
                   </div>
