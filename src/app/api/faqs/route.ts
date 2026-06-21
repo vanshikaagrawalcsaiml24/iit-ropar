@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { sanitizeInput, escapeRegex } from '@/lib/security';
 import { checkRateLimit, getClientIp, rateLimitResponse, RATE_LIMITS } from '@/lib/rateLimit';
 import { searchFaqs, addFaqToQdrant, deleteFaqFromQdrant, generateQdrantId } from '@/lib/qdrant';
+import { resolveLegacyCategory } from '@/lib/categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ async function isAdminAuthenticated(): Promise<boolean> {
   return !!(adminToken && adminToken.value === 'authenticated');
 }
 
-// GET /api/faqs — list all FAQs or search
+// GET /api/faqs — list all FAQs, search, or filter by category/subcategory
 export async function GET(request: NextRequest) {
   try {
     // Rate limit
@@ -33,12 +34,49 @@ export async function GET(request: NextRequest) {
     const db = await getDb();
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get('q');
+    const categoryFilter = searchParams.get('category');
+    const subcategoryFilter = searchParams.get('subcategory');
 
     let faqs;
     if (q && q.trim()) {
       // Use AI Semantic Search via Qdrant
       const sanitized = sanitizeInput(q);
-      faqs = await searchFaqs(sanitized, 5);
+      faqs = await searchFaqs(sanitized, 10);
+    } else if (categoryFilter || subcategoryFilter) {
+      // Filter by category/subcategory from MongoDB
+      // We need to handle both new-format FAQs (with explicit category + subcategory)
+      // and legacy FAQs (with only a freeform category field)
+      const allFaqs = await db
+        .collection('faqs')
+        .find({})
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      faqs = allFaqs.filter((faq) => {
+        let faqCategory: string;
+        let faqSubcategory: string;
+
+        if (faq.subcategory) {
+          // New format: explicit category + subcategory
+          faqCategory = faq.category || '';
+          faqSubcategory = faq.subcategory || '';
+        } else {
+          // Legacy format: resolve from freeform category
+          const resolved = resolveLegacyCategory(faq.category || '');
+          faqCategory = resolved.category;
+          faqSubcategory = resolved.subcategory;
+        }
+
+        if (categoryFilter && subcategoryFilter) {
+          return (
+            faqCategory.toLowerCase() === categoryFilter.toLowerCase() &&
+            faqSubcategory.toLowerCase() === subcategoryFilter.toLowerCase()
+          );
+        } else if (categoryFilter) {
+          return faqCategory.toLowerCase() === categoryFilter.toLowerCase();
+        }
+        return true;
+      });
     } else {
       // Return all FAQs if no query
       faqs = await db
@@ -74,6 +112,7 @@ export async function POST(request: NextRequest) {
     const question = sanitizeInput(body.question || '');
     const answer = sanitizeInput(body.answer || '');
     const category = sanitizeInput(body.category || '');
+    const subcategory = sanitizeInput(body.subcategory || '');
 
     if (!question || !answer) {
       return Response.json({ error: 'Question and answer are required' }, { status: 400 });
@@ -85,13 +124,14 @@ export async function POST(request: NextRequest) {
       question,
       answer,
       category,
+      subcategory,
       qdrantId,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
     try {
-      await addFaqToQdrant(qdrantId, question, answer, category);
+      await addFaqToQdrant(qdrantId, question, answer, category, subcategory);
     } catch (error) {
       console.error('Failed to add FAQ to Qdrant:', error);
       // Proceed anyway, but in production we might want a retry queue or rollback

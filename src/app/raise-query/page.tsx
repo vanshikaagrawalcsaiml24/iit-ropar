@@ -11,7 +11,7 @@ interface TrackedQuery {
   ticketId: string;
   title?: string;
   question: string;
-  status: 'active' | 'in-review' | 'resolved';
+  status: 'active' | 'in-review' | 'resolved' | 'escalated';
   proposedAnswer?: string;
   approvals: string[];
   requiredApprovals: number;
@@ -159,8 +159,8 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
   };
 
   // Track query
-  const handleTrackQuery = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleTrackQuery = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!trackTicketId.trim()) return;
 
     setTracking(true);
@@ -471,6 +471,15 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
                 {tracking ? 'Tracking...' : '📍 Track Query'}
               </button>
             </form>
+          )}
+        </div>
+
+            {trackedQuery && (
+              <div style={{ animation: 'slideUp 0.4s ease' }}>
+                <QueryStatusCard query={trackedQuery} onEscalated={() => { handleTrackQuery(); fetchMyQueries(); }} />
+              </div>
+            )}
+          </div>
 
             {trackedQuery && (
               <div style={{ animation: 'slideUp 0.4s ease' }}>
@@ -483,6 +492,18 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
     </div>
   );
 }
+
+/* ===== Similar FAQ Item with match %, reviews, verified ===== */
+function SimilarFAQItem({ faq, rank }: { faq: any; rank: number }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Simulate a match score from the vector search score field (Qdrant returns a score 0-1)
+  const matchScore = faq.score
+    ? Math.round(faq.score * 100)
+    : Math.max(95 - rank * 12, 40);
+
+  // Review count (from the FAQ data or default)
+  const reviewCount = faq.reviewCount || faq.upvotes || 0;
 
 
 /* ===== Similar FAQ Item with match %, reviews, verified ===== */
@@ -550,7 +571,41 @@ function SimilarFAQItem({ faq, rank }: { faq: any; rank: number }) {
 
 
 /* ===== Query Status Card (right sidebar) ===== */
-function QueryStatusCard({ query }: { query: TrackedQuery }) {
+function QueryStatusCard({ query, onEscalated }: { query: TrackedQuery; onEscalated?: () => void }) {
+  const [escalating, setEscalating] = useState(false);
+  const [escalateError, setEscalateError] = useState('');
+
+  const handleEscalate = async () => {
+    if (!confirm('Are you sure you want to escalate this query to an admin?')) return;
+    setEscalating(true);
+    setEscalateError('');
+    try {
+      const res = await fetch('/api/queries/escalate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: query.ticketId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (onEscalated) onEscalated();
+      } else {
+        setEscalateError(data.error || 'Failed to escalate');
+      }
+    } catch {
+      setEscalateError('Network error. Please try again.');
+    } finally {
+      setEscalating(false);
+    }
+  };
+
+  return (
+    <div className="rq-status-card">
+      {/* Ticket ID */}
+      <div className="rq-ticket-block">
+        <div className="rq-ticket-label">Ticket ID</div>
+        <div className="rq-ticket-id-value">{query.ticketId}</div>
+      </div>
+
   return (
     <div className="rq-status-card">
       {/* Ticket ID */}
@@ -573,7 +628,7 @@ function QueryStatusCard({ query }: { query: TrackedQuery }) {
         <div className="rq-timeline-label">Query Status Timeline</div>
         <div style={{ position: 'relative' }}>
           <StatusTracker
-            status={query.status}
+            status={query.status === 'escalated' ? 'resolved' : query.status}
             approvals={query.approvals?.length || 0}
             requiredApprovals={query.requiredApprovals || 3}
           />
@@ -601,12 +656,39 @@ function QueryStatusCard({ query }: { query: TrackedQuery }) {
         </div>
       )}
 
-      {/* Resolved Answer */}
-      {query.status === 'resolved' && query.proposedAnswer && (
+      {/* Resolved/Escalated Answer */}
+      {(query.status === 'resolved' || query.status === 'escalated') && query.proposedAnswer && (
         <div className="rq-resolved-answer">
-          <div className="rq-resolved-label">✅ Resolved Answer</div>
+          <div className="rq-resolved-label">
+            {query.status === 'escalated' ? '📝 Proposed Answer (Escalated)' : '✅ Resolved Answer'}
+          </div>
           <div className="rq-resolved-text">{query.proposedAnswer}</div>
+          
+          {query.status === 'resolved' && (query.approvals?.length || 0) >= (query.requiredApprovals || 3) && (
+            <div className="rq-escalate-section" style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)', borderTop: '1px solid var(--border-light)' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-sm)' }}>
+                Not satisfied with this answer?
+              </p>
+              {escalateError && <div className="error-alert" style={{ marginBottom: 'var(--space-sm)' }}>{escalateError}</div>}
+              <button 
+                className="btn btn-secondary w-full" 
+                onClick={handleEscalate}
+                disabled={escalating}
+              >
+                {escalating ? 'Escalating...' : '🚨 Escalate to Admin'}
+              </button>
+            </div>
+          )}
         </div>
+      )}
+
+      {query.status === 'escalated' && (
+         <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-md)', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 'var(--radius-md)', borderLeft: '4px solid #ef4444' }}>
+            <div style={{ fontWeight: 500, color: '#ef4444', marginBottom: 'var(--space-xs)' }}>🚨 Escalated to Admin</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+              This query has been escalated. An admin will review and resolve it shortly.
+            </div>
+         </div>
       )}
     </div>
   );

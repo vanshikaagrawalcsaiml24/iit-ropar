@@ -52,7 +52,8 @@ export async function addFaqToQdrant(
   qdrantId: string,
   question: string,
   answer: string,
-  category?: string
+  category?: string,
+  subcategory?: string
 ) {
   const textToEmbed = `${question} ${answer}`;
   const vector = await Embedder.embed(textToEmbed);
@@ -67,6 +68,7 @@ export async function addFaqToQdrant(
           question,
           answer,
           category: category || '',
+          subcategory: subcategory || '',
           tags: [],
           createdAt: new Date().toISOString(),
         },
