@@ -48,18 +48,59 @@ export async function GET(request: NextRequest) {
     }
 
     if (status === 'active') {
-      // Get one random active query for solving
-      const activeQueries = await db
-        .collection('queries')
-        .find({ status: { $in: ['active', 'in-review'] } })
-        .toArray();
-
-      if (activeQueries.length === 0) {
-        return Response.json({ query: null });
+      const user = await verifySession();
+      if (!user) {
+        return Response.json({ error: 'Authentication required' }, { status: 401 });
       }
 
-      const randomIndex = Math.floor(Math.random() * activeQueries.length);
-      return Response.json({ query: activeQueries[randomIndex] });
+      // Auto-escalate queries unresolved (active/in-review) for 48 hours
+      const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      await db.collection('queries').updateMany(
+        {
+          status: { $in: ['active', 'in-review'] },
+          createdAt: { $lt: fortyEightHoursAgo }
+        },
+        {
+          $set: {
+            status: 'escalated',
+            escalatedAt: new Date(),
+            autoEscalated: true,
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+      // Support exclude param for skipped queries
+      const excludeIds = searchParams.get('exclude')?.split(',').filter(Boolean) || [];
+      const excludeObjectIds = excludeIds.map(id => {
+        try {
+          return new ObjectId(id);
+        } catch {
+          return null;
+        }
+      }).filter((id): id is ObjectId => id !== null);
+
+      const queryFilter: any = {
+        userId: { $ne: new ObjectId(user.userId) },
+        status: { $in: ['active', 'in-review', 'escalated'] },
+        createdAt: { $gte: tenDaysAgo },
+        approvals: { $ne: user.userId }
+      };
+
+      if (excludeObjectIds.length > 0) {
+        queryFilter._id = { $nin: excludeObjectIds };
+      }
+
+      // Priority of which was asked first: sort by createdAt ascending (1)
+      const queries = await db.collection('queries')
+        .find(queryFilter)
+        .sort({ createdAt: 1 })
+        .limit(10)
+        .toArray();
+
+      return Response.json({ queries });
     }
 
     // Return all queries

@@ -26,6 +26,8 @@ interface EscalatedQuery {
   question: string;
   status: string;
   createdAt: string;
+  upvotes?: number;
+  autoEscalated?: boolean;
 }
 
 type TabMode = 'faqs' | 'escalated' | 'analytics' | 'admins';
@@ -403,8 +405,19 @@ export default function AdminDashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {escalated.map(q => (
                 <div key={q._id} style={{ padding: '16px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{q.ticketId}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{q.ticketId}</span>
+                      {q.status === 'escalated' ? (
+                        <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontWeight: 600 }}>
+                          🚨 Escalated {q.autoEscalated ? '(Auto)' : ''}
+                        </span>
+                      ) : (
+                        <span className="badge" style={{ background: 'rgba(139, 92, 246, 0.1)', color: 'rgba(139, 92, 246, 1)', border: '1px solid rgba(139, 92, 246, 0.2)', fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontWeight: 600 }}>
+                          👍 10+ Upvotes Review
+                        </span>
+                      )}
+                    </div>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(q.createdAt).toLocaleDateString()}</span>
                   </div>
                   <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>{q.question}</h3>

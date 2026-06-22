@@ -471,19 +471,9 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
                 {tracking ? 'Tracking...' : '📍 Track Query'}
               </button>
             </form>
-          )}
-        </div>
-
             {trackedQuery && (
               <div style={{ animation: 'slideUp 0.4s ease' }}>
                 <QueryStatusCard query={trackedQuery} onEscalated={() => { handleTrackQuery(); fetchMyQueries(); }} />
-              </div>
-            )}
-          </div>
-
-            {trackedQuery && (
-              <div style={{ animation: 'slideUp 0.4s ease' }}>
-                <QueryStatusCard query={trackedQuery} />
               </div>
             )}
           </div>
@@ -492,18 +482,6 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
     </div>
   );
 }
-
-/* ===== Similar FAQ Item with match %, reviews, verified ===== */
-function SimilarFAQItem({ faq, rank }: { faq: any; rank: number }) {
-  const [expanded, setExpanded] = useState(false);
-
-  // Simulate a match score from the vector search score field (Qdrant returns a score 0-1)
-  const matchScore = faq.score
-    ? Math.round(faq.score * 100)
-    : Math.max(95 - rank * 12, 40);
-
-  // Review count (from the FAQ data or default)
-  const reviewCount = faq.reviewCount || faq.upvotes || 0;
 
 
 /* ===== Similar FAQ Item with match %, reviews, verified ===== */
@@ -598,13 +576,7 @@ function QueryStatusCard({ query, onEscalated }: { query: TrackedQuery; onEscala
     }
   };
 
-  return (
-    <div className="rq-status-card">
-      {/* Ticket ID */}
-      <div className="rq-ticket-block">
-        <div className="rq-ticket-label">Ticket ID</div>
-        <div className="rq-ticket-id-value">{query.ticketId}</div>
-      </div>
+
 
   return (
     <div className="rq-status-card">

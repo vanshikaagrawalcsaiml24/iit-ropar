@@ -27,8 +27,31 @@ export async function GET() {
         }
 
         const db = await getDb();
+
+        // Auto-escalate queries unresolved (active/in-review) for 48 hours
+        const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        await db.collection('queries').updateMany(
+            {
+                status: { $in: ['active', 'in-review'] },
+                createdAt: { $lt: fortyEightHoursAgo }
+            },
+            {
+                $set: {
+                    status: 'escalated',
+                    escalatedAt: new Date(),
+                    autoEscalated: true,
+                    updatedAt: new Date()
+                }
+            }
+        );
+
         const escalatedQueries = await db.collection('queries')
-            .find({ status: 'escalated' })
+            .find({
+                $or: [
+                    { status: 'escalated' },
+                    { status: { $ne: 'resolved' }, upvotes: { $gte: 10 } }
+                ]
+            })
             .sort({ createdAt: -1 })
             .toArray();
 
@@ -66,8 +89,8 @@ export async function POST(request: NextRequest) {
             return Response.json({ error: 'Query not found' }, { status: 404 });
         }
 
-        if (query.status !== 'escalated') {
-            return Response.json({ error: 'Query is not in escalated status' }, { status: 400 });
+        if (query.status !== 'escalated' && !(query.status !== 'resolved' && (query.upvotes || 0) >= 10)) {
+            return Response.json({ error: 'Query is not in escalated status or review status' }, { status: 400 });
         }
 
         // Mark query as resolved
