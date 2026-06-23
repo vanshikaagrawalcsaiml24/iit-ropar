@@ -114,7 +114,8 @@ export async function POST(request: NextRequest) {
         await db.collection('faqs').insertOne({
             question,
             answer: sanitizedAnswer.trim(),
-            category: 'Admin Resolved',
+            category: 'Other',
+            subcategory: 'General',
             qdrantId,
             createdFromQuery: queryId,
             createdAt: new Date(),
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
 
         // Embed and add to Qdrant vector database
         try {
-            await addFaqToQdrant(qdrantId, question, sanitizedAnswer.trim(), 'Admin Resolved');
+            await addFaqToQdrant(qdrantId, question, sanitizedAnswer.trim(), 'Other', 'General');
         } catch (error) {
             console.error('Failed to add FAQ to Qdrant:', error);
         }

@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server';
 import { getDb } from '@/lib/mongodb';
-import { FAQ_CATEGORIES, resolveLegacyCategory } from '@/lib/categories';
+import { getCategories, resolveToKnownCategory } from '@/lib/categories';
 import { checkRateLimit, getClientIp, rateLimitResponse, RATE_LIMITS } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
 
     const db = await getDb();
 
+    // Get dynamic categories
+    const dynamicCategories = await getCategories();
+
     // Get all FAQs to compute counts
     const allFaqs = await db.collection('faqs').find({}).toArray();
 
@@ -23,7 +26,7 @@ export async function GET(request: NextRequest) {
     const categoryCounts: Record<string, number> = {};
     const subcategoryCounts: Record<string, Record<string, number>> = {};
 
-    for (const cat of FAQ_CATEGORIES) {
+    for (const cat of dynamicCategories) {
       categoryCounts[cat.name] = 0;
       subcategoryCounts[cat.name] = {};
       for (const sub of cat.subcategories) {
@@ -32,28 +35,27 @@ export async function GET(request: NextRequest) {
     }
 
     for (const faq of allFaqs) {
-      // If FAQ already has the new category + subcategory fields, use them
-      if (faq.subcategory && faq.category) {
-        const catName = faq.category;
-        const subName = faq.subcategory;
-        if (categoryCounts[catName] !== undefined) {
-          categoryCounts[catName]++;
-          if (subcategoryCounts[catName]?.[subName] !== undefined) {
-            subcategoryCounts[catName][subName]++;
-          }
-        }
-      } else {
-        // Resolve legacy category
-        const resolved = resolveLegacyCategory(faq.category || '');
-        categoryCounts[resolved.category] = (categoryCounts[resolved.category] || 0) + 1;
-        if (subcategoryCounts[resolved.category]) {
-          subcategoryCounts[resolved.category][resolved.subcategory] =
-            (subcategoryCounts[resolved.category][resolved.subcategory] || 0) + 1;
+      // Resolve category properly (if unknown, goes to Other > General)
+      const resolved = resolveToKnownCategory(faq.category || '', faq.subcategory || '', dynamicCategories);
+      
+      const catName = resolved.category;
+      const subName = resolved.subcategory;
+
+      if (categoryCounts[catName] !== undefined) {
+        categoryCounts[catName]++;
+        if (subcategoryCounts[catName]?.[subName] !== undefined) {
+          subcategoryCounts[catName][subName]++;
+        } else {
+           // Fallback to general/first subcategory count if somehow the subcategory count map wasn't initialized for it
+           const firstSub = dynamicCategories.find(c => c.name === catName)?.subcategories[0] || 'General';
+           if (subcategoryCounts[catName]?.[firstSub] !== undefined) {
+               subcategoryCounts[catName][firstSub]++;
+           }
         }
       }
     }
 
-    const categories = FAQ_CATEGORIES.map((cat) => ({
+    const categories = dynamicCategories.map((cat) => ({
       name: cat.name,
       icon: cat.icon,
       gradient: cat.gradient,

@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { sanitizeInput, escapeRegex } from '@/lib/security';
 import { checkRateLimit, getClientIp, rateLimitResponse, RATE_LIMITS } from '@/lib/rateLimit';
 import { searchFaqs, addFaqToQdrant, deleteFaqFromQdrant, generateQdrantId } from '@/lib/qdrant';
-import { resolveLegacyCategory } from '@/lib/categories';
+import { getCategories, resolveToKnownCategory } from '@/lib/categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,28 +44,18 @@ export async function GET(request: NextRequest) {
       faqs = await searchFaqs(sanitized, 10);
     } else if (categoryFilter || subcategoryFilter) {
       // Filter by category/subcategory from MongoDB
-      // We need to handle both new-format FAQs (with explicit category + subcategory)
-      // and legacy FAQs (with only a freeform category field)
       const allFaqs = await db
         .collection('faqs')
         .find({})
         .sort({ createdAt: -1 })
         .toArray();
 
-      faqs = allFaqs.filter((faq) => {
-        let faqCategory: string;
-        let faqSubcategory: string;
+      const dynamicCategories = await getCategories();
 
-        if (faq.subcategory) {
-          // New format: explicit category + subcategory
-          faqCategory = faq.category || '';
-          faqSubcategory = faq.subcategory || '';
-        } else {
-          // Legacy format: resolve from freeform category
-          const resolved = resolveLegacyCategory(faq.category || '');
-          faqCategory = resolved.category;
-          faqSubcategory = resolved.subcategory;
-        }
+      faqs = allFaqs.filter((faq) => {
+        const resolved = resolveToKnownCategory(faq.category || '', faq.subcategory || '', dynamicCategories);
+        const faqCategory = resolved.category;
+        const faqSubcategory = resolved.subcategory;
 
         if (categoryFilter && subcategoryFilter) {
           return (

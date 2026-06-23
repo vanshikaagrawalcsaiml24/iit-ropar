@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import ConfirmModal from '@/components/ConfirmModal';
-import { FAQ_CATEGORIES } from '@/lib/categories';
 
 interface FAQ {
   _id: string;
@@ -12,6 +11,7 @@ interface FAQ {
   category?: string;
   subcategory?: string;
   createdAt: string;
+  isEmbedded?: boolean;
 }
 
 interface AdminUser {
@@ -30,7 +30,7 @@ interface EscalatedQuery {
   autoEscalated?: boolean;
 }
 
-type TabMode = 'faqs' | 'escalated' | 'analytics' | 'admins' | 'vector-db';
+type TabMode = 'faqs' | 'escalated' | 'analytics' | 'admins' | 'vector-db' | 'categories';
 
 // Utility: clean up FAQ question text for display
 // Removes § symbols, strips leading section numbering (e.g. "1.2", "2.3.1"), and capitalizes first letter
@@ -61,6 +61,16 @@ export default function AdminDashboardPage() {
   const [role, setRole] = useState<'super_admin' | 'admin' | null>(null);
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<TabMode>('escalated');
+
+  // Categories state
+  const [dynamicCategories, setDynamicCategories] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newSubcategoryName, setNewSubcategoryName] = useState('');
+  const [selectedCategoryForSub, setSelectedCategoryForSub] = useState('');
+  const [catMessage, setCatMessage] = useState('');
+  const [catError, setCatError] = useState('');
+  const [managingCategory, setManagingCategory] = useState<string | null>(null);
 
   // FAQ state
   const [question, setQuestion] = useState('');
@@ -200,15 +210,31 @@ export default function AdminDashboardPage() {
     }
   }, [role]);
 
+  const fetchCategories = useCallback(async () => {
+    setLoadingCategories(true);
+    try {
+      const res = await fetch('/api/admin/categories');
+      if (res.ok) {
+        const data = await res.json();
+        setDynamicCategories(data.categories || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (authenticated) {
+      fetchCategories();
       if (activeTab === 'faqs') fetchFaqs();
       if (activeTab === 'escalated') fetchEscalated();
       if (activeTab === 'analytics') fetchAnalytics();
       if (activeTab === 'admins') fetchAdmins();
       if (activeTab === 'vector-db') fetchVectorFaqs();
     }
-  }, [authenticated, activeTab, fetchFaqs, fetchEscalated, fetchAnalytics, fetchAdmins, fetchVectorFaqs]);
+  }, [authenticated, activeTab, fetchFaqs, fetchEscalated, fetchAnalytics, fetchAdmins, fetchVectorFaqs, fetchCategories]);
 
   // Actions
   const handleAddFaq = async (e: React.FormEvent) => {
@@ -375,6 +401,97 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_category', name: newCategoryName }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCatMessage(data.message);
+        setNewCategoryName('');
+        fetchCategories();
+        setTimeout(() => setCatMessage(''), 3000);
+      } else {
+        setCatError(data.error);
+        setTimeout(() => setCatError(''), 3000);
+      }
+    } catch {
+      setCatError('Network error');
+    }
+  };
+
+  const handleDeleteCategory = async (name: string) => {
+    if (!confirm(`Are you sure you want to delete the category "${name}"? All FAQs in this category will be moved to "Other".`)) return;
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_category', categoryName: name }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCatMessage(data.message);
+        fetchCategories();
+        if (activeTab === 'faqs') fetchFaqs();
+        setTimeout(() => setCatMessage(''), 3000);
+      } else {
+        alert(data.error);
+      }
+    } catch {
+      alert('Network error');
+    }
+  };
+
+  const handleAddSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCategoryForSub || !newSubcategoryName.trim()) return;
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_subcategory', categoryName: selectedCategoryForSub, subcategoryName: newSubcategoryName }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCatMessage(data.message);
+        setNewSubcategoryName('');
+        fetchCategories();
+        setTimeout(() => setCatMessage(''), 3000);
+      } else {
+        setCatError(data.error);
+        setTimeout(() => setCatError(''), 3000);
+      }
+    } catch {
+      setCatError('Network error');
+    }
+  };
+
+  const handleDeleteSubcategory = async (categoryName: string, subcategoryName: string) => {
+    if (!confirm(`Are you sure you want to delete subcategory "${subcategoryName}"?`)) return;
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_subcategory', categoryName, subcategoryName }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCatMessage(data.message);
+        fetchCategories();
+        setTimeout(() => setCatMessage(''), 3000);
+      } else {
+        alert(data.error);
+      }
+    } catch {
+      alert('Network error');
+    }
+  };
+
   const filteredVectorFaqs = vectorFaqs.filter((faq) => {
     if (!vectorSearchQuery.trim()) return true;
     const q = vectorSearchQuery.toLowerCase();
@@ -436,6 +553,11 @@ export default function AdminDashboardPage() {
         {role === 'super_admin' && (
           <button className={`btn ${activeTab === 'vector-db' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setActiveTab('vector-db')}>
             🧠 Vector DB
+          </button>
+        )}
+        {role === 'super_admin' && (
+          <button className={`btn ${activeTab === 'categories' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setActiveTab('categories')}>
+            📁 Categories
           </button>
         )}
         {role === 'super_admin' && (
@@ -602,32 +724,32 @@ export default function AdminDashboardPage() {
               </div>
               <div className="input-group mb-md">
                 <label className="input-label" htmlFor="faq-category">Category</label>
-                <select 
-                  id="faq-category" 
-                  className="input" 
-                  value={category} 
+                <select
+                  id="faq-category"
+                  className="input"
+                  value={category}
                   onChange={(e) => {
                     setCategory(e.target.value);
                     setSubcategory('');
                   }}
                 >
                   <option value="">Select a category...</option>
-                  {FAQ_CATEGORIES.map(cat => (
+                  {dynamicCategories.map(cat => (
                     <option key={cat.name} value={cat.name}>{cat.name}</option>
                   ))}
                 </select>
               </div>
               <div className="input-group mb-lg">
                 <label className="input-label" htmlFor="faq-subcategory">Subcategory</label>
-                <select 
-                  id="faq-subcategory" 
-                  className="input" 
-                  value={subcategory} 
+                <select
+                  id="faq-subcategory"
+                  className="input"
+                  value={subcategory}
                   onChange={(e) => setSubcategory(e.target.value)}
                   disabled={!category}
                 >
                   <option value="">Select a subcategory...</option>
-                  {category && FAQ_CATEGORIES.find(c => c.name === category)?.subcategories.map(sub => (
+                  {category && dynamicCategories.find(c => c.name === category)?.subcategories.map((sub: string) => (
                     <option key={sub} value={sub}>{sub}</option>
                   ))}
                 </select>
@@ -824,7 +946,7 @@ export default function AdminDashboardPage() {
                             id={`edit-category-${faq._id}`}
                           >
                             <option value="">Select a category...</option>
-                            {FAQ_CATEGORIES.map(cat => (
+                            {dynamicCategories.map(cat => (
                               <option key={cat.name} value={cat.name}>{cat.name}</option>
                             ))}
                           </select>
@@ -839,7 +961,7 @@ export default function AdminDashboardPage() {
                             id={`edit-subcategory-${faq._id}`}
                           >
                             <option value="">Select a subcategory...</option>
-                            {editCategory && FAQ_CATEGORIES.find(c => c.name === editCategory)?.subcategories.map(sub => (
+                            {editCategory && dynamicCategories.find(c => c.name === editCategory)?.subcategories.map((sub: string) => (
                               <option key={sub} value={sub}>{sub}</option>
                             ))}
                           </select>
@@ -874,6 +996,11 @@ export default function AdminDashboardPage() {
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace', background: 'rgba(139, 92, 246, 0.1)', padding: '2px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(139, 92, 246, 0.15)' }}>
                               🧬 {String(faq._id).slice(-8)}
                             </span>
+                            {faq.isEmbedded === false && (
+                              <span className="not-embedded-badge">
+                                ⚠️ Not in Vector DB
+                              </span>
+                            )}
                             {faq.createdAt && (
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                 {new Date(faq.createdAt).toLocaleDateString()}
@@ -915,6 +1042,128 @@ export default function AdminDashboardPage() {
           variant="danger"
         />
       )}
+      {activeTab === 'categories' && role === 'super_admin' && (
+        <div className="admin-dashboard">
+          <div className="glass-card" style={{ animation: 'slideUp 0.5s ease' }}>
+            <div className="section-title">
+              <span className="section-title-icon">📁</span> 
+              {managingCategory ? `Manage Subcategories: ${managingCategory}` : 'Manage Categories'}
+            </div>
+            
+            {catMessage && (
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '12px', borderRadius: '8px', color: 'var(--accent-green-light)', marginBottom: '16px' }}>
+                {catMessage}
+              </div>
+            )}
+            {catError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px', borderRadius: '8px', color: 'var(--accent-red-light)', marginBottom: '16px' }}>
+                {catError}
+              </div>
+            )}
+
+            {managingCategory ? (
+              /* --- DRILL DOWN VIEW --- */
+              <div style={{ animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+                  <button 
+                    className="btn btn-secondary btn-sm" 
+                    onClick={() => setManagingCategory(null)}
+                  >
+                    ← Back to Categories
+                  </button>
+                </div>
+                
+                <div style={{ padding: '24px', background: 'var(--bg-glass)', borderRadius: '16px', border: '1px solid var(--border-subtle)', marginBottom: '32px' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Add New Subcategory</h3>
+                  <form onSubmit={(e) => { setSelectedCategoryForSub(managingCategory); handleAddSubcategory(e); }} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                    <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                      <input className="input" type="text" placeholder="Subcategory Name (e.g. Health Insurance)" value={newSubcategoryName} onChange={(e) => setNewSubcategoryName(e.target.value)} required />
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap', alignSelf: 'stretch' }}>Add Subcategory</button>
+                  </form>
+                </div>
+
+                <h3 style={{ marginBottom: '20px', fontSize: '1.2rem', fontWeight: 600 }}>Existing Subcategories</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                  {dynamicCategories.find(c => c.name === managingCategory)?.subcategories.map((sub: string) => (
+                    <div key={sub} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'var(--bg-glass)', borderRadius: '12px', border: '1px solid var(--border-subtle)', transition: 'all 0.2s' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)' }}>{sub}</span>
+                      {dynamicCategories.find(c => c.name === managingCategory)?.subcategories.length > 1 && (
+                        <button 
+                          className="btn btn-ghost btn-sm btn-icon" 
+                          onClick={() => handleDeleteSubcategory(managingCategory, sub)}
+                          title="Delete Subcategory"
+                          style={{ color: 'var(--accent-red-light)', opacity: 0.8 }}
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* --- MAIN CATEGORIES GRID VIEW --- */
+              <div style={{ animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ padding: '20px', background: 'var(--bg-glass)', borderRadius: '16px', border: '1px solid var(--border-subtle)', marginBottom: '32px' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '1.1rem' }}>Create New Category</h3>
+                  <form onSubmit={handleAddCategory} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                    <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                      <input className="input" type="text" placeholder="Category Name (e.g. Financial Aid)" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} required />
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap', alignSelf: 'stretch' }}>Add Category</button>
+                  </form>
+                </div>
+
+                <div className="category-grid">
+                  {dynamicCategories.map(cat => {
+                    const slug = cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    
+                    return (
+                      <div 
+                        key={cat.name} 
+                        className="category-card" 
+                        data-category={slug}
+                        onClick={() => setManagingCategory(cat.name)}
+                        role="button"
+                        tabIndex={0}
+                        style={{ display: 'flex', flexDirection: 'column' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div className="category-card-icon" style={{ background: cat.gradient || 'var(--accent-blue)', marginBottom: '16px' }}>
+                            {cat.icon}
+                          </div>
+                          {cat.name !== 'Other' && (
+                            <button 
+                              className="btn btn-ghost btn-sm btn-icon" 
+                              onClick={(e) => { e.stopPropagation(); handleDeleteCategory(cat.name); }} 
+                              title="Delete Category" 
+                              style={{ color: 'var(--accent-red-light)', opacity: 0.7 }}
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="category-card-title" style={{ marginBottom: '8px' }}>{cat.name}</div>
+                        <div className="category-card-desc" style={{ marginBottom: '16px', flex: 1 }}>{cat.description || 'Click to manage subcategories'}</div>
+                        
+                        <div className="category-card-footer" style={{ marginTop: 'auto' }}>
+                          <div className="category-card-count">
+                            <span className="count-number">{cat.subcategories.length}</span> Subcategories
+                          </div>
+                          <div className="category-card-arrow">→</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
