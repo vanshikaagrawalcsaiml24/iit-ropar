@@ -8,6 +8,7 @@ import { ObjectId } from 'mongodb';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
+import { predictDifficulty } from '@/lib/difficulty';
 
 const execAsync = promisify(exec);
 
@@ -149,17 +150,10 @@ export async function POST(request: NextRequest) {
     const db = await getDb();
     const ticketId = generateTicketId();
 
-    // Predict difficulty using the Python NLP module
+    // Predict difficulty using native heuristic
     let difficulty = 'Unrated';
     try {
-      // Escape quotes for Windows command line
-      const escapedQuestion = question.replace(/"/g, '""');
-      // Absolute path to predict.py based on user's directory structure
-      const pythonScriptPath = "c:\\Users\\HP\\OneDrive\\Desktop\\faq project\\predict.py";
-      const { stdout } = await execAsync(`python "${pythonScriptPath}" "${escapedQuestion}"`);
-      if (stdout && stdout.trim()) {
-        difficulty = stdout.trim();
-      }
+      difficulty = predictDifficulty(question);
     } catch (e) {
       console.error('Failed to predict difficulty:', e);
     }

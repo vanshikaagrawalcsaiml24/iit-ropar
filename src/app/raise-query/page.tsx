@@ -17,6 +17,7 @@ interface TrackedQuery {
   approvals: string[];
   requiredApprovals: number;
   createdAt: string;
+  userId?: string;
 }
 
 type FlowStep = 'write' | 'results' | 'generate-title' | 'submitted';
@@ -479,7 +480,12 @@ function RaiseQueryContent({ user }: { user: { userId: string; username: string 
             </form>
             {trackedQuery && (
               <div style={{ animation: 'slideUp 0.4s ease' }}>
-                <QueryStatusCard query={trackedQuery} onEscalated={() => { handleTrackQuery(); fetchMyQueries(); }} />
+                <QueryStatusCard 
+                  query={trackedQuery} 
+                  currentUserId={user.userId}
+                  onEscalated={() => { handleTrackQuery(); fetchMyQueries(); }} 
+                  onResolved={() => { handleTrackQuery(); fetchMyQueries(); }}
+                />
               </div>
             )}
           </div>
@@ -555,9 +561,12 @@ function SimilarFAQItem({ faq, rank }: { faq: any; rank: number }) {
 
 
 /* ===== Query Status Card (right sidebar) ===== */
-function QueryStatusCard({ query, onEscalated }: { query: TrackedQuery; onEscalated?: () => void }) {
+function QueryStatusCard({ query, onEscalated, onResolved, currentUserId }: { query: TrackedQuery; onEscalated?: () => void; onResolved?: () => void; currentUserId?: string }) {
   const [escalating, setEscalating] = useState(false);
   const [escalateError, setEscalateError] = useState('');
+  
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState('');
 
   const handleEscalate = async () => {
     if (!confirm('Are you sure you want to escalate this query to an admin?')) return;
@@ -579,6 +588,29 @@ function QueryStatusCard({ query, onEscalated }: { query: TrackedQuery; onEscala
       setEscalateError('Network error. Please try again.');
     } finally {
       setEscalating(false);
+    }
+  };
+
+  const handleResolve = async () => {
+    if (!confirm('Are you sure you want to mark this query as resolved? It will be removed from the active queries list.')) return;
+    setResolving(true);
+    setResolveError('');
+    try {
+      const res = await fetch('/api/queries/mark-resolved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: query.ticketId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (onResolved) onResolved();
+      } else {
+        setResolveError(data.error || 'Failed to mark as resolved');
+      }
+    } catch {
+      setResolveError('Network error. Please try again.');
+    } finally {
+      setResolving(false);
     }
   };
 
@@ -638,6 +670,23 @@ function QueryStatusCard({ query, onEscalated }: { query: TrackedQuery; onEscala
           <div className="approval-text">
             {query.approvals?.length || 0} of {query.requiredApprovals || 3} peer approvals received
           </div>
+          
+          {/* Asker mark as resolved button */}
+          {currentUserId && query.userId && currentUserId === query.userId.toString() && (
+            <div className="rq-escalate-section" style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)', borderTop: '1px solid var(--border-light)' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-sm)' }}>
+                Did you figure it out yourself?
+              </p>
+              {resolveError && <div className="error-alert" style={{ marginBottom: 'var(--space-sm)' }}>{resolveError}</div>}
+              <button 
+                className="btn btn-primary w-full" 
+                onClick={handleResolve}
+                disabled={resolving}
+              >
+                {resolving ? 'Resolving...' : '✅ Mark as Resolved'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
